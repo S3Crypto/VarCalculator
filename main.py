@@ -1,19 +1,46 @@
 import pandas as pd
+import requests
+import json
+
+def fetch_historical_data(symbol, api_key, outputsize='compact'):
+    url = f"https://www.alphavantage.co/query"
+    params = {
+        'function': 'TIME_SERIES_DAILY_ADJUSTED',
+        'symbol': symbol,
+        'outputsize': outputsize,
+        'apikey': api_key
+    }
+    response = requests.get(url, params=params)
+    data = response.json()
+
+    if 'Time Series (Daily)' not in data:
+        raise ValueError(f"Error fetching data for {symbol}: {data.get('Note', 'Unknown error')}")
+
+    tsd = data['Time Series (Daily)']
+    df = pd.DataFrame.from_dict(tsd, orient='index')
+    df.index = pd.to_datetime(df.index)
+    df = df.sort_index()
+    df = df[['5. adjusted close']]
+    df.columns = ['Price']
+    return df
 
 def historical_var(returns, confidence_level=0.95):
     sorted_returns = returns.sort_values()
     index = int((1 - confidence_level) * len(sorted_returns))
     return abs(sorted_returns.iloc[index])
 
+# Load API key from config file
+with open('config.json', 'r') as f:
+    config = json.load(f)
+    api_key = config['api_key']
+
 # Collect user inputs
-file_path = input("Enter the path to the CSV file containing historical prices: ")
+symbol = input("Enter the stock symbol: ")
 confidence_level = float(input("Enter the confidence level (e.g., 0.95 for 95%): "))
 time_horizon = int(input("Enter the time horizon in days: "))
 
-# Read historical price data from CSV
-df = pd.read_csv(file_path)
-df['Date'] = pd.to_datetime(df['Date'])
-df.set_index('Date', inplace=True)
+# Fetch historical data from Alpha Vantage
+df = fetch_historical_data(symbol, api_key)
 
 # Calculate daily returns
 df['Return'] = df['Price'].pct_change().dropna()
@@ -30,7 +57,7 @@ summary_stats = returns.describe()
 
 # Detailed output
 print("\n========== VaR Calculation Details ==========")
-print(f"Input File: {file_path}")
+print(f"Stock Symbol: {symbol}")
 print(f"Confidence Level: {confidence_level * 100}%")
 print(f"Time Horizon: {time_horizon} day(s)")
 print("\nSummary Statistics of Returns:")

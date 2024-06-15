@@ -5,7 +5,7 @@ import json
 def fetch_historical_data(symbol, api_key, outputsize='compact'):
     url = f"https://www.alphavantage.co/query"
     params = {
-        'function': 'TIME_SERIES_DAILY_ADJUSTED',
+        'function': 'TIME_SERIES_DAILY',
         'symbol': symbol,
         'outputsize': outputsize,
         'apikey': api_key
@@ -14,14 +14,20 @@ def fetch_historical_data(symbol, api_key, outputsize='compact'):
     data = response.json()
 
     if 'Time Series (Daily)' not in data:
+        print("API response:", data)  # Debugging line to print the raw API response
         raise ValueError(f"Error fetching data for {symbol}: {data.get('Note', 'Unknown error')}")
 
     tsd = data['Time Series (Daily)']
     df = pd.DataFrame.from_dict(tsd, orient='index')
     df.index = pd.to_datetime(df.index)
     df = df.sort_index()
-    df = df[['5. adjusted close']]
+    df = df[['4. close']]
     df.columns = ['Price']
+    
+    # Convert Price column to numeric, forcing errors to NaN and then dropping them
+    df['Price'] = pd.to_numeric(df['Price'], errors='coerce')
+    df = df.dropna()
+
     return df
 
 def historical_var(returns, confidence_level=0.95):
@@ -40,7 +46,11 @@ confidence_level = float(input("Enter the confidence level (e.g., 0.95 for 95%):
 time_horizon = int(input("Enter the time horizon in days: "))
 
 # Fetch historical data from Alpha Vantage
-df = fetch_historical_data(symbol, api_key)
+try:
+    df = fetch_historical_data(symbol, api_key)
+except ValueError as e:
+    print(e)
+    exit(1)
 
 # Calculate daily returns
 df['Return'] = df['Price'].pct_change().dropna()

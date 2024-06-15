@@ -3,8 +3,10 @@ import numpy as np
 import requests
 import json
 import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy.stats import mstats
 
-def fetch_historical_data(symbol, api_key, outputsize='compact'):
+def fetch_historical_data(symbol, api_key, outputsize='full'):
     url = f"https://www.alphavantage.co/query"
     params = {
         'function': 'TIME_SERIES_DAILY',
@@ -70,32 +72,41 @@ except ValueError as e:
 df['Return'] = df['Price'].pct_change().dropna()
 returns = df['Return'].dropna()
 
-# Calculate VaR
-var = historical_var(returns, confidence_level)
+# Winsorize the returns to mitigate the impact of outliers
+winsorized_returns = mstats.winsorize(returns, limits=[0.025, 0.025])
 
-# Adjust VaR for the time horizon
-adjusted_var = var * (time_horizon ** 0.5)
+# Convert MaskedArray back to pandas Series
+winsorized_returns = pd.Series(winsorized_returns, index=returns.index)
 
-# Summary statistics of returns
-summary_stats = returns.describe()
+# Plot the distribution of returns
+plt.figure(figsize=(10, 6))
+sns.histplot(winsorized_returns, bins=50, kde=True)
+plt.title(f'Distribution of Daily Returns for {symbol} (Winsorized)')
+plt.xlabel('Daily Return')
+plt.ylabel('Frequency')
+plt.grid(True)
+plt.show()
+
+# Calculate VaR for different confidence levels
+confidence_levels = np.arange(0.90, 1.00, 0.01)
+var_values = [historical_var(winsorized_returns, cl) for cl in confidence_levels]
+adjusted_var_values = [var * (time_horizon ** 0.5) for var in var_values]
 
 # Detailed output
 print("\n========== VaR Calculation Details ==========")
 print(f"Stock Symbol: {symbol}")
 print(f"Confidence Level: {confidence_level * 100}%")
 print(f"Time Horizon: {time_horizon} day(s)")
-print("\nSummary Statistics of Returns:")
+print("\nSummary Statistics of Winsorized Returns:")
+summary_stats = winsorized_returns.describe()
 print(summary_stats)
 print("\nIntermediate Calculations:")
-print(f"Sorted Returns:\n{returns.sort_values().values}")
-print(f"Index for {confidence_level * 100}% confidence level: {int((1 - confidence_level) * len(returns))}")
+print(f"Sorted Winsorized Returns:\n{winsorized_returns.sort_values().values}")
+print(f"Index for {confidence_level * 100}% confidence level: {int((1 - confidence_level) * len(winsorized_returns))}")
+var = historical_var(winsorized_returns, confidence_level)
+adjusted_var = var * (time_horizon ** 0.5)
 print(f"VaR for 1 day: {var:.2%}")
 print(f"VaR adjusted for {time_horizon} day(s): {adjusted_var:.2%}")
-
-# Additional confidence levels
-confidence_levels = np.arange(0.90, 1.00, 0.01)
-var_values = [historical_var(returns, cl) for cl in confidence_levels]
-adjusted_var_values = [var * (time_horizon ** 0.5) for var in var_values]
 
 print("\nVaR at Multiple Confidence Levels:")
 for cl, adj_var in zip(confidence_levels, adjusted_var_values):

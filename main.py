@@ -57,8 +57,6 @@ with open('config.json', 'r') as f:
 
 # Collect user inputs
 symbol = input("Enter the stock symbol: ")
-confidence_input = input("Enter the confidence level (e.g., 95%, 95, .95, 0.95): ")
-confidence_level = regularize_confidence_level(confidence_input)
 time_horizon = int(input("Enter the time horizon in days: "))
 
 # Fetch historical data from Alpha Vantage
@@ -78,15 +76,6 @@ winsorized_returns = mstats.winsorize(returns, limits=[0.025, 0.025])
 # Convert MaskedArray back to pandas Series
 winsorized_returns = pd.Series(winsorized_returns, index=returns.index)
 
-# Plot the distribution of returns
-plt.figure(figsize=(10, 6))
-sns.histplot(winsorized_returns, bins=50, kde=True)
-plt.title(f'Distribution of Daily Returns for {symbol} (Winsorized)')
-plt.xlabel('Daily Return')
-plt.ylabel('Frequency')
-plt.grid(True)
-plt.show()
-
 # Calculate VaR for different confidence levels
 confidence_levels = np.arange(0.90, 1.00, 0.01)
 var_values = [historical_var(winsorized_returns, cl) for cl in confidence_levels]
@@ -95,24 +84,31 @@ adjusted_var_values = [var * (time_horizon ** 0.5) for var in var_values]
 # Detailed output
 print("\n========== VaR Calculation Details ==========")
 print(f"Stock Symbol: {symbol}")
-print(f"Confidence Level: {confidence_level * 100}%")
 print(f"Time Horizon: {time_horizon} day(s)")
 print("\nSummary Statistics of Winsorized Returns:")
 summary_stats = winsorized_returns.describe()
 print(summary_stats)
 print("\nIntermediate Calculations:")
 print(f"Sorted Winsorized Returns:\n{winsorized_returns.sort_values().values}")
-print(f"Index for {confidence_level * 100}% confidence level: {int((1 - confidence_level) * len(winsorized_returns))}")
-var = historical_var(winsorized_returns, confidence_level)
+print(f"Index for 95.0% confidence level: {int((1 - 0.95) * len(winsorized_returns))}")
+var = historical_var(winsorized_returns, 0.95)
 adjusted_var = var * (time_horizon ** 0.5)
-print(f"VaR for 1 day: {var:.2%}")
-print(f"VaR adjusted for {time_horizon} day(s): {adjusted_var:.2%}")
+print(f"VaR for 1 day at 95% confidence level: {var:.2%}")
+print(f"VaR adjusted for {time_horizon} day(s) at 95% confidence level: {adjusted_var:.2%}")
 
 print("\nVaR at Multiple Confidence Levels:")
 for cl, adj_var in zip(confidence_levels, adjusted_var_values):
     print(f"VaR at {cl * 100:.1f}% confidence level: {adj_var:.2%}")
 
 print("\n=============================================")
+
+# Plotting the distribution of returns
+plt.figure(figsize=(10, 6))
+sns.histplot(winsorized_returns, bins=50, kde=True)
+plt.title(f'Distribution of Daily Returns for {symbol} (Winsorized)')
+plt.xlabel('Daily Return')
+plt.ylabel('Frequency')
+plt.grid(True)
 
 # Plotting the VaR values
 plt.figure(figsize=(10, 6))
@@ -121,4 +117,6 @@ plt.title(f'Value at Risk (VaR) for {symbol}')
 plt.xlabel('Confidence Level (%)')
 plt.ylabel('VaR')
 plt.grid(True)
+
+# Show all plots
 plt.show()

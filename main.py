@@ -35,6 +35,17 @@ def historical_var(returns, confidence_level=0.95):
     index = int((1 - confidence_level) * len(sorted_returns))
     return abs(sorted_returns.iloc[index])
 
+def regularize_confidence_level(confidence_input):
+    # Remove any '%' symbols and convert to a float
+    confidence_str = confidence_input.replace('%', '')
+    confidence_value = float(confidence_str)
+
+    # If the value is greater than 1, assume it is a percentage and convert to decimal
+    if confidence_value > 1:
+        confidence_value /= 100
+
+    return confidence_value
+
 # Load API key from config file
 with open('config.json', 'r') as f:
     config = json.load(f)
@@ -42,7 +53,8 @@ with open('config.json', 'r') as f:
 
 # Collect user inputs
 symbol = input("Enter the stock symbol: ")
-confidence_level = float(input("Enter the confidence level (e.g., 0.95 for 95%): "))
+confidence_input = input("Enter the confidence level (e.g., 95%, 95, .95, 0.95): ")
+confidence_level = regularize_confidence_level(confidence_input)
 time_horizon = int(input("Enter the time horizon in days: "))
 
 # Fetch historical data from Alpha Vantage

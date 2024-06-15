@@ -1,6 +1,8 @@
 import pandas as pd
+import numpy as np
 import requests
 import json
+import matplotlib.pyplot as plt
 
 def fetch_historical_data(symbol, api_key, outputsize='compact'):
     url = f"https://www.alphavantage.co/query"
@@ -91,11 +93,21 @@ print(f"VaR for 1 day: {var:.2%}")
 print(f"VaR adjusted for {time_horizon} day(s): {adjusted_var:.2%}")
 
 # Additional confidence levels
-confidence_levels = [0.90, 0.95, 0.99]
+confidence_levels = np.arange(0.90, 1.00, 0.01)
+var_values = [historical_var(returns, cl) for cl in confidence_levels]
+adjusted_var_values = [var * (time_horizon ** 0.5) for var in var_values]
+
 print("\nVaR at Multiple Confidence Levels:")
-for cl in confidence_levels:
-    var = historical_var(returns, cl)
-    adjusted_var = var * (time_horizon ** 0.5)
-    print(f"VaR at {cl * 100}% confidence level: {adjusted_var:.2%}")
+for cl, adj_var in zip(confidence_levels, adjusted_var_values):
+    print(f"VaR at {cl * 100:.1f}% confidence level: {adj_var:.2%}")
 
 print("\n=============================================")
+
+# Plotting the VaR values
+plt.figure(figsize=(10, 6))
+plt.plot(confidence_levels * 100, adjusted_var_values, marker='o')
+plt.title(f'Value at Risk (VaR) for {symbol}')
+plt.xlabel('Confidence Level (%)')
+plt.ylabel('VaR')
+plt.grid(True)
+plt.show()
